@@ -62,6 +62,14 @@ last_usage = {}
 COOLDOWN_MINUTES = 10
 pending_replies = {} 
 
+# --- 🃏 TAROT KARTLARI ---
+TAROT_CARDS = [
+    "Deli", "Büyücü", "Azize", "İmparatoriçe", "İmparator", "Aziz",
+    "Aşıklar", "Savaş Arabası", "Güç", "Ermiş", "Kader Çarkı", "Adalet",
+    "Asılan Adam", "Ölüm", "Denge", "Şeytan", "Yıkılan Kule", "Yıldız",
+    "Ay", "Güneş", "Mahkeme", "Dünya"
+]
+
 # --- 3. BOT FONKSİYONLARI ---
 
 async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -115,6 +123,17 @@ async def emilile_command(update, context):
         res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         await target.reply_text(f"😒 {res.text}")
     except: pass
+
+async def tarot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id != AUTHORIZED_GROUP_ID: 
+        return
+    secilenler = random.sample(TAROT_CARDS, 3)
+    status = await update.message.reply_text("🃏 Kartlar karıştırılıyor...")
+    try:
+        res = client.models.generate_content(model=MODEL_NAME, contents=f"Tarot: {', '.join(secilenler)} mistik biraz da samimi bir dille yorumla. Maks 100 kelime kullan. * sembolü kullanma. yorumda kartlardan bahsederken 'asılan adam' gibi değil asılan adam kartı gibi bahset yani tarot bilmeyen biri dahi anlayabilsin. geçmiş şimdi ve gelecek kartlarını 3 ayrı paragrafa böl.")
+        await status.edit_text(f"🔮 TAROT FALI:\n\n🃏 Kartlar: {', '.join(secilenler)}\n\n📜 Yorum:\n{res.text}")
+    except: 
+        await status.edit_text("Ruhlar alemine ulaşılamadı.")
 
 async def admin_text_reply(update, context):
     if update.effective_chat.type != 'private' or update.effective_user.id not in ADMIN_IDS or not context.args: return
@@ -217,23 +236,6 @@ async def getir_command(update, context):
         res = "📜 **SON MESAJLAR:**\n\n" + "\n".join([f"👤 {message_id_cache[m_id]['name']} -> https://t.me/c/{clean_id}/{m_id}" for m_id in list(message_id_cache.keys())[-5:]])
         await update.message.reply_text(res)
 
-async def tarotbak_command(update, context):
-    if update.effective_chat.id != AUTHORIZED_GROUP_ID: 
-        return
-        
-    target_text = ""
-    if update.message.reply_to_message:
-        target_text = f"Hedef kişinin mesajı: {update.message.reply_to_message.text}"
-    
-    # DİKKAT: Aşağıdaki promptu KENDİ ORİJİNAL TAROT PROMPTUN İLE değiştirmeyi unutma!
-    prompt = f"(Mistik, gizemli ve hafif karanlık ama samimi bir tarot okuyucususun). {target_text} GÖREVİN: Bu kişiye veya duruma özel, 3 kartlık kısa ve etkileyici bir tarot açılımı yap. gecmiş şimdi ve gelecek için 3 paragraf halinde yaz. yazıda asılan adam demek yerine asılan adam kartı gibi bahset Maksimum 100 kelime olsun."
-    
-    try:
-        res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-        await update.message.reply_text(f"🔮 {res.text}")
-    except Exception as e:
-        print(f"Tarot hatası: {e}")
-
 # --- 4. ANA ÇALIŞTIRICI ---
 
 async def main():
@@ -244,10 +246,10 @@ async def main():
     application.add_handler(CommandHandler("yorumla", comment_command))
     application.add_handler(CommandHandler("kamilaca", kamilaca_command))
     application.add_handler(CommandHandler("emilile", emilile_command))
+    application.add_handler(CommandHandler("tarotbak", tarot_command))
     application.add_handler(CommandHandler("yanitla", admin_text_reply))
     application.add_handler(CommandHandler("getir", getir_command))
     application.add_handler(CommandHandler("kendinyanitla", kendin_yanitla_command))
-    application.add_handler(CommandHandler("tarotbak", tarotbak_command))
     application.add_handler(MessageHandler(filters.Regex(r'(?i)^/son(50|100)(@.*)?$'), summarize_command))
     application.add_handler(MessageHandler((filters.TEXT | filters.VOICE | filters.AUDIO) & (~filters.COMMAND), record_message))
 
