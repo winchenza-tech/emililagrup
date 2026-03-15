@@ -217,6 +217,23 @@ async def getir_command(update, context):
         res = "📜 **SON MESAJLAR:**\n\n" + "\n".join([f"👤 {message_id_cache[m_id]['name']} -> https://t.me/c/{clean_id}/{m_id}" for m_id in list(message_id_cache.keys())[-5:]])
         await update.message.reply_text(res)
 
+async def tarotbak_command(update, context):
+    if update.effective_chat.id != AUTHORIZED_GROUP_ID: 
+        return
+        
+    target_text = ""
+    if update.message.reply_to_message:
+        target_text = f"Hedef kişinin mesajı: {update.message.reply_to_message.text}"
+    
+    # DİKKAT: Aşağıdaki promptu KENDİ ORİJİNAL TAROT PROMPTUN İLE değiştirmeyi unutma!
+    prompt = f"(Mistik, gizemli ve hafif karanlık ama samimi bir tarot okuyucususun). {target_text} GÖREVİN: Bu kişiye veya duruma özel, 3 kartlık kısa ve etkileyici bir tarot açılımı yap. gecmiş şimdi ve gelecek için 3 paragraf halinde yaz. yazıda asılan adam demek yerine asılan adam kartı gibi bahset Maksimum 100 kelime olsun."
+    
+    try:
+        res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+        await update.message.reply_text(f"🔮 {res.text}")
+    except Exception as e:
+        print(f"Tarot hatası: {e}")
+
 # --- 4. ANA ÇALIŞTIRICI ---
 
 async def main():
@@ -230,6 +247,7 @@ async def main():
     application.add_handler(CommandHandler("yanitla", admin_text_reply))
     application.add_handler(CommandHandler("getir", getir_command))
     application.add_handler(CommandHandler("kendinyanitla", kendin_yanitla_command))
+    application.add_handler(CommandHandler("tarotbak", tarotbak_command))
     application.add_handler(MessageHandler(filters.Regex(r'(?i)^/son(50|100)(@.*)?$'), summarize_command))
     application.add_handler(MessageHandler((filters.TEXT | filters.VOICE | filters.AUDIO) & (~filters.COMMAND), record_message))
 
