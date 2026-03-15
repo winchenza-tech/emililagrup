@@ -39,7 +39,7 @@ ADMIN_IDS = [7094870780]
 
 UNAUTHORIZED_IMAGE_URL = "https://i.ibb.co/zTjGk8rv/MG-8095.jpg"
 UNAUTHORIZED_ERROR_TEXT = (
-    "Sadece ES JUSTO grubunda çalışacağını söyledik.\n\n"
+    "Sadece BEKLER grubunda çalışacağını söyledik.\n\n"
     "Okuduğun basit bir cümleyi anlamayacak kadar gerizekalı isen "
     "altta verdiğim linkten beyin gelişim egzersizleri yapabilirsin.\n"
     "https://www.mentalup.net/blog/zeka-gelistirici-oyunlar"
