@@ -187,7 +187,7 @@ async def summarize_command(update, context):
 
         await asyncio.sleep(3)
         if not gemini_task.done():
-            try: await status_msg.edit_text("🤖 Cıtkırıldroid Bot yapay zeka entegrasyonunu aktif hale getiriyor...")
+            try: await status_msg.edit_text("🤖 Bekler Bot yapay zeka entegrasyonunu aktif hale getiriyor...")
             except: pass
 
         if not gemini_task.done():
