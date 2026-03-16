@@ -37,6 +37,7 @@ AUTHORIZED_GROUP_ID = -1002906566461
 # --- 👑 YÖNETİCİ AYARLARI ---
 ADMIN_IDS = [7094870780, 993948902, 8363077895]
 ZENITHAR_ID = 7094870780
+TRANSLATOR_IDS = [993948902, 8363077895] # Otomatik çeviri yetkisi olanlar
 
 UNAUTHORIZED_IMAGE_URL = "https://i.ibb.co/zTjGk8rv/MG-8095.jpg"
 UNAUTHORIZED_ERROR_TEXT = (
@@ -58,7 +59,7 @@ MODEL_NAME = 'gemini-2.0-flash'
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
 group_history = deque(maxlen=110)
-admin_pm_history = deque(maxlen=5) # Adminlerin bota attığı son 5 mesaj için hafıza
+admin_pm_history = deque(maxlen=5) 
 message_id_cache = {} 
 last_usage = {}
 COOLDOWN_MINUTES = 10
@@ -76,16 +77,33 @@ TAROT_CARDS = [
 
 async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == 'private' and update.effective_user.id in ADMIN_IDS:
-        # Adminlerin bota yazdığı metin mesajlarını hafızaya al
+        
+        # Adminlerin bota yazdığı metin mesajlarını hafızaya al (Senin görebilmen için)
         if update.message and update.message.text:
             admin_pm_history.append(f"👤 {update.effective_user.first_name}: {update.message.text}")
 
+        # Yanıt bekleme durumu varsa önce onu hallet
         if update.effective_user.id in pending_replies:
             target_id = pending_replies.pop(update.effective_user.id)
             if update.message.text: await context.bot.send_message(chat_id=AUTHORIZED_GROUP_ID, text=update.message.text, reply_to_message_id=target_id)
             elif update.message.voice: await context.bot.send_voice(chat_id=AUTHORIZED_GROUP_ID, voice=update.message.voice.file_id, reply_to_message_id=target_id)
             elif update.message.audio: await context.bot.send_audio(chat_id=AUTHORIZED_GROUP_ID, audio=update.message.audio.file_id, reply_to_message_id=target_id)
             return
+
+        # YENİ: Çevirmen id'lerinden biri bota doğrudan metin atarsa otomatik çevir
+        if update.effective_user.id in TRANSLATOR_IDS and update.message and update.message.text:
+            status_msg = await update.message.reply_text("⏳ Çevriliyor...")
+            prompt = (
+                "Görev: Aşağıdaki metin Türkçe ise Kiril alfabesi ile Rusçaya, Rusça ise Türkçeye çevir. "
+                "Sadece ve sadece çevrilmiş metni ver, başka hiçbir açıklama, yorum veya ek kelime yazma.\n\n"
+                f"Metin: {update.message.text}"
+            )
+            try:
+                res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                await status_msg.edit_text(f"🌍 {res.text}")
+            except Exception as e:
+                await status_msg.edit_text(f"❌ Çeviri sırasında bir hata oluştu:\n{e}")
+            return # Çeviriyi yapıp işlemi bitirir, gruba vs. bir şey atmaz
 
     if update.effective_chat.id == AUTHORIZED_GROUP_ID and update.message and update.message.text:
         u_id = update.effective_user.id
@@ -159,11 +177,9 @@ async def kendin_yanitla_command(update, context):
 async def cevir_command(update, context):
     is_admin_pm = update.effective_chat.type == 'private' and update.effective_user.id in ADMIN_IDS
     
-    # Grupta değilse ve Admin özel mesajı değilse iptal et
     if update.effective_chat.id != AUTHORIZED_GROUP_ID and not is_admin_pm: 
         return
     
-    # Komut özelden kullanıldıysa admin geçmişine kaydet
     if is_admin_pm:
         target_info = update.message.reply_to_message.text[:20] + "..." if update.message.reply_to_message and update.message.reply_to_message.text else "[Metin Yok]"
         admin_pm_history.append(f"👤 {update.effective_user.first_name}: /cevir komutunu kullandı. (Hedef: {target_info})")
@@ -191,7 +207,6 @@ async def cevir_command(update, context):
     except Exception as e: 
         await status_msg.edit_text(f"❌ Çeviri sırasında bir hata oluştu:\n{e}")
 
-# YENİ KOMUT: SADECE ZENITHAR GÖREBİLİR
 async def getircevirgetir_command(update, context):
     if update.effective_user.id == ZENITHAR_ID:
         if not admin_pm_history:
@@ -302,7 +317,7 @@ async def main():
     application.add_handler(CommandHandler("getir", getir_command))
     application.add_handler(CommandHandler("kendinyanitla", kendin_yanitla_command))
     application.add_handler(CommandHandler("cevir", cevir_command))
-    application.add_handler(CommandHandler("getircevirgetir", getircevirgetir_command)) # YENİ KOMUT EKLENDİ
+    application.add_handler(CommandHandler("getircevirgetir", getircevirgetir_command))
     application.add_handler(MessageHandler(filters.Regex(r'(?i)^/son(50|100)(@.*)?$'), summarize_command))
     application.add_handler(MessageHandler((filters.TEXT | filters.VOICE | filters.AUDIO) & (~filters.COMMAND), record_message))
 
