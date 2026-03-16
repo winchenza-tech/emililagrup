@@ -150,6 +150,34 @@ async def kendin_yanitla_command(update, context):
         pending_replies[update.effective_user.id] = int(context.args[0].split('/')[-1])
         await update.message.reply_text("🎯 Hedef kilitlendi. Cevabı gönder.")
 
+# GÜNCELLENMİŞ VE HATA MESAJLARI EKLENMİŞ ÇEVİRİ FONKSİYONU
+async def cevir_command(update, context):
+    if update.effective_chat.id != AUTHORIZED_GROUP_ID: 
+        return
+    
+    if not update.message.reply_to_message:
+        await update.message.reply_text("❌ Lütfen çevirmek istediğin mesaja yanıt vererek (reply) /cevir yaz.")
+        return
+    
+    target_text = update.message.reply_to_message.text
+    if not target_text:
+        await update.message.reply_text("❌ Yanıtladığın mesajda çevrilecek bir metin bulamadım.")
+        return
+
+    status_msg = await update.message.reply_text("⏳ Çevriliyor...")
+
+    prompt = (
+        "Görev: Aşağıdaki metin Türkçe ise Kiril alfabesi ile Rusçaya, Rusça ise Türkçeye çevir. "
+        "Sadece ve sadece çevrilmiş metni ver, başka hiçbir açıklama, yorum veya ek kelime yazma.\n\n"
+        f"Metin: {target_text}"
+    )
+    
+    try:
+        res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+        await status_msg.edit_text(f"🌍 {res.text}")
+    except Exception as e: 
+        await status_msg.edit_text(f"❌ Çeviri sırasında bir hata oluştu:\n{e}")
+
 async def summarize_command(update, context):
     if update.effective_chat.id != AUTHORIZED_GROUP_ID:
         await update.message.reply_photo(photo=UNAUTHORIZED_IMAGE_URL, caption=UNAUTHORIZED_ERROR_TEXT)
@@ -250,6 +278,7 @@ async def main():
     application.add_handler(CommandHandler("yanitla", admin_text_reply))
     application.add_handler(CommandHandler("getir", getir_command))
     application.add_handler(CommandHandler("kendinyanitla", kendin_yanitla_command))
+    application.add_handler(CommandHandler("cevir", cevir_command))
     application.add_handler(MessageHandler(filters.Regex(r'(?i)^/son(50|100)(@.*)?$'), summarize_command))
     application.add_handler(MessageHandler((filters.TEXT | filters.VOICE | filters.AUDIO) & (~filters.COMMAND), record_message))
 
