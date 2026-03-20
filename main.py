@@ -118,11 +118,10 @@ async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Sondaki " jjj" kısmını metinden çıkarıyoruz
             text_to_translate = msg_text[:-4].strip()
             
-            # Kullanıcıya çevrildiğine dair ufak bir bildirim
+            # Asıl mesaj silineceği için "reply" olarak değil, normal mesaj olarak gönderiyoruz
             status_msg = await context.bot.send_message(
                 chat_id=AUTHORIZED_GROUP_ID, 
-                text="⏳ Çevriliyor...", 
-                reply_to_message_id=update.message.message_id
+                text="⏳ Çevriliyor..."
             )
             
             prompt = (
@@ -132,8 +131,17 @@ async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             try:
                 res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-                # Senin istediğin format: İsim: Çeviri
                 await status_msg.edit_text(f"🌍 {u_name}: {res.text}")
+                
+                # Orijinal "jjj"li mesajı sil
+                try:
+                    await update.message.delete()
+                except Exception as e:
+                    print(f"Mesaj silinemedi (Botun yetkisi olmayabilir): {e}")
+                
+                # Botun özet hafızasına asıl anlamsız metin yerine çeviriyi kaydetmesi daha sağlıklı olur
+                msg_text = f"[Çeviri] {res.text}" 
+                
             except Exception as e:
                 await status_msg.edit_text(f"❌ Çeviri sırasında bir hata oluştu:\n{e}")
 
