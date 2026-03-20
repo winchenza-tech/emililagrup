@@ -124,6 +124,17 @@ async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text="⏳ Çevriliyor..."
             )
             
+            # Kişiye özel renkli emoji belirleme
+            isim_kucuk = u_name.lower()
+            if u_id == ZENITHAR_ID or "zenithar" in isim_kucuk:
+                prefix = "🟩"
+            elif "kamila" in isim_kucuk:
+                prefix = "🟦"
+            elif "эмилия" in isim_kucuk: # Kiril alfabesiyle Emiliya
+                prefix = "🟥"
+            else:
+                prefix = "🌍" # Diğer kişiler kullanırsa diye varsayılan
+            
             prompt = (
                 "Görev: Aşağıdaki metin Türkçe ise Kiril alfabesi ile Rusçaya, Rusça ise Türkçeye çevir. "
                 "Sadece ve sadece çevrilmiş metni ver, başka hiçbir açıklama, yorum veya ek kelime yazma.\n\n"
@@ -131,7 +142,9 @@ async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             try:
                 res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-                await status_msg.edit_text(f"🌍 {u_name}: {res.text}")
+                
+                # İsim ve Emojiyi ekleyerek mesajı düzenle
+                await status_msg.edit_text(f"{prefix} {u_name}: {res.text}")
                 
                 # Orijinal "jjj"li mesajı sil
                 try:
