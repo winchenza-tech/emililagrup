@@ -90,7 +90,7 @@ async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif update.message.audio: await context.bot.send_audio(chat_id=AUTHORIZED_GROUP_ID, audio=update.message.audio.file_id, reply_to_message_id=target_id)
             return
 
-        # YENİ: Çevirmen id'lerinden biri bota doğrudan metin atarsa otomatik çevir
+        # Çevirmen id'lerinden biri bota doğrudan metin atarsa otomatik çevir
         if update.effective_user.id in TRANSLATOR_IDS and update.message and update.message.text:
             status_msg = await update.message.reply_text("⏳ Çevriliyor...")
             prompt = (
@@ -105,12 +105,41 @@ async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status_msg.edit_text(f"❌ Çeviri sırasında bir hata oluştu:\n{e}")
             return # Çeviriyi yapıp işlemi bitirir, gruba vs. bir şey atmaz
 
+    # --- GRUP MESAJLARI VE "jjj" KONTROLÜ ---
     if update.effective_chat.id == AUTHORIZED_GROUP_ID and update.message and update.message.text:
         u_id = update.effective_user.id
         u_name = FELICIA_NAME if u_id == FELICIA_ID else TUNA_NAME if u_id == TUNA_ID else update.effective_user.first_name
         if len(u_name) <= 2: u_name = f"{u_name}"
-        group_history.append(f"{u_name}: {update.message.text}")
-        message_id_cache[update.message.message_id] = {"name": u_name, "text": update.message.text}
+        
+        msg_text = update.message.text
+
+        # Eğer mesaj " jjj" ile bitiyorsa
+        if msg_text.endswith(" jjj"):
+            # Sondaki " jjj" kısmını metinden çıkarıyoruz
+            text_to_translate = msg_text[:-4].strip()
+            
+            # Kullanıcıya çevrildiğine dair ufak bir bildirim
+            status_msg = await context.bot.send_message(
+                chat_id=AUTHORIZED_GROUP_ID, 
+                text="⏳ Çevriliyor...", 
+                reply_to_message_id=update.message.message_id
+            )
+            
+            prompt = (
+                "Görev: Aşağıdaki metin Türkçe ise Kiril alfabesi ile Rusçaya, Rusça ise Türkçeye çevir. "
+                "Sadece ve sadece çevrilmiş metni ver, başka hiçbir açıklama, yorum veya ek kelime yazma.\n\n"
+                f"Metin: {text_to_translate}"
+            )
+            try:
+                res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+                # Senin istediğin format: İsim: Çeviri
+                await status_msg.edit_text(f"🌍 {u_name}: {res.text}")
+            except Exception as e:
+                await status_msg.edit_text(f"❌ Çeviri sırasında bir hata oluştu:\n{e}")
+
+        # Normal mesaj kayıt işlemleri aynen devam ediyor
+        group_history.append(f"{u_name}: {msg_text}")
+        message_id_cache[update.message.message_id] = {"name": u_name, "text": msg_text}
         if len(message_id_cache) > 50: del message_id_cache[next(iter(message_id_cache))]
 
 async def announce_command(update, context):
@@ -173,39 +202,6 @@ async def kendin_yanitla_command(update, context):
     if update.effective_chat.type == 'private' and update.effective_user.id in ADMIN_IDS and context.args:
         pending_replies[update.effective_user.id] = int(context.args[0].split('/')[-1])
         await update.message.reply_text("🎯 Hedef kilitlendi. Cevabı gönder.")
-
-async def cevir_command(update, context):
-    is_admin_pm = update.effective_chat.type == 'private' and update.effective_user.id in ADMIN_IDS
-    
-    if update.effective_chat.id != AUTHORIZED_GROUP_ID and not is_admin_pm: 
-        return
-    
-    if is_admin_pm:
-        target_info = update.message.reply_to_message.text[:20] + "..." if update.message.reply_to_message and update.message.reply_to_message.text else "[Metin Yok]"
-        admin_pm_history.append(f"👤 {update.effective_user.first_name}: /cevir komutunu kullandı. (Hedef: {target_info})")
-    
-    if not update.message.reply_to_message:
-        await update.message.reply_text("❌ Lütfen çevirmek istediğin mesaja yanıt vererek (reply) /cevir yaz.")
-        return
-    
-    target_text = update.message.reply_to_message.text
-    if not target_text:
-        await update.message.reply_text("❌ Yanıtladığın mesajda çevrilecek bir metin bulamadım.")
-        return
-
-    status_msg = await update.message.reply_text("⏳ Çevriliyor...")
-
-    prompt = (
-        "Görev: Aşağıdaki metin Türkçe ise Kiril alfabesi ile Rusçaya, Rusça ise Türkçeye çevir. "
-        "Sadece ve sadece çevrilmiş metni ver, başka hiçbir açıklama, yorum veya ek kelime yazma.\n\n"
-        f"Metin: {target_text}"
-    )
-    
-    try:
-        res = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-        await status_msg.edit_text(f"🌍 {res.text}")
-    except Exception as e: 
-        await status_msg.edit_text(f"❌ Çeviri sırasında bir hata oluştu:\n{e}")
 
 async def getircevirgetir_command(update, context):
     if update.effective_user.id == ZENITHAR_ID:
@@ -316,7 +312,6 @@ async def main():
     application.add_handler(CommandHandler("yanitla", admin_text_reply))
     application.add_handler(CommandHandler("getir", getir_command))
     application.add_handler(CommandHandler("kendinyanitla", kendin_yanitla_command))
-    application.add_handler(CommandHandler("cevir", cevir_command))
     application.add_handler(CommandHandler("getircevirgetir", getircevirgetir_command))
     application.add_handler(MessageHandler(filters.Regex(r'(?i)^/son(50|100)(@.*)?$'), summarize_command))
     application.add_handler(MessageHandler((filters.TEXT | filters.VOICE | filters.AUDIO) & (~filters.COMMAND), record_message))
